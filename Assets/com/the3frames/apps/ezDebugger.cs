@@ -19,9 +19,12 @@ public class ezDebugger : MonoBehaviour {
 	// size
 	private int intContentBoardLeft = 5;
 	private int intContentBoardTop = 5;
+    private int intScrollBoardMarginLeftRight = 20;// gap
 	private int intComponentHorizontalGap = 5;
 	private int intComponentVerticalGap = 5;
 	public int intMinInputAreaHeight = 0;
+
+    public int intScrollWindowHeight = 0;
 
 	// debug textarea
 	private Rect mRectDebugTextArea;
@@ -67,12 +70,23 @@ public class ezDebugger : MonoBehaviour {
 	void Start () {
 		CalcViewSize();
 
+        // init scroll point
+        scrollPosition.x = intContentBoardLeft;
+        scrollPosition.y = intContentBoardTop + 20;// 20 is the title bar's height
+        
         mDefaultFontStyleRef = new GUIStyle();
         mDebuggerFontStyleRef = new GUIStyle();
         mDefaultFontStyleRef.normal.textColor = Color.white;
         mDefaultFontStyleRef.fontSize = intDefaultFontSize;
+        mDefaultFontStyleRef.wordWrap = true;
+
+#if !UNITY_EDITOR && (UNITY_ANDROID || UNITY_IOS)
+        intScrollBoardMarginLeftRight *= 2;
+#endif
+
         mDebuggerFontStyleRef.normal.textColor = Color.green;
         mDebuggerFontStyleRef.fontSize = intDebugInfoFontSize;
+        mDebuggerFontStyleRef.wordWrap = true;
 
         // internal call
         InternalRegistCommand();
@@ -86,11 +100,15 @@ public class ezDebugger : MonoBehaviour {
 		intWindowHeight = (int)(Screen.height * fWindowHeightFactor);
 
 		mWindowSizeRect.x = mWindowSizeRect.y = 0;
-		mWindowSizeRect.width = intWindowWidth;
+        mWindowSizeRect.x = Screen.width - intWindowWidth;
+
+        mWindowSizeRect.width = intWindowWidth;
 		mWindowSizeRect.height = intWindowHeight;
-		
-		// debug textarea
-		mRectDebugTextArea.x = intContentBoardLeft;
+
+        intScrollWindowHeight = intWindowHeight - 20 - intContentBoardTop * 2 - intDebugInputHeight;
+
+        // debug textarea
+        mRectDebugTextArea.x = intContentBoardLeft;
 		mRectDebugTextArea.y = intContentBoardTop + 20;// 20 is the title bar's height
 		mRectDebugTextArea.width = intWindowWidth - intContentBoardLeft*2;
 		intMinInputAreaHeight = intDebugInputHeight + intContentBoardTop + intComponentVerticalGap;
@@ -112,7 +130,10 @@ public class ezDebugger : MonoBehaviour {
 		mRectEnterBtn.y = mRectDebugInputSize.y;
 		mRectEnterBtn.width = intWindowWidth - mRectEnterBtn.x - intContentBoardLeft;
 		mRectEnterBtn.height = mRectDebugInputSize.height;
-	}
+
+        
+
+    }
 
 	public static bool mIsQuiteDebugger = false;
     private int intDraggableTitleHeight = 120;
@@ -123,31 +144,43 @@ public class ezDebugger : MonoBehaviour {
     public static GUIStyle mDebuggerFontStyleRef = null;
 	void OnGUI()
 	{
-		if( !mIsQuiteDebugger )
+#if !UNITY_EDITOR && (UNITY_ANDROID || UNITY_IOS)
+        GUI.skin.verticalScrollbar.fixedWidth = Screen.width * 0.025f;
+        GUI.skin.verticalScrollbarThumb.fixedWidth = Screen.width * 0.025f;
+#endif
+
+        if ( !mIsQuiteDebugger )
 			mWindowSizeRect = GUI.Window(0, mWindowSizeRect, OnMyWindowDrawHandler, mWindowTilteName+" - "+mDebuggerVersion );
 	}
 
-	void OnMyWindowDrawHandler(int intWindowId)
+    private GUIStyle myStyle = new GUIStyle();
+    public Vector2 scrollPosition = Vector2.zero;
+    void OnMyWindowDrawHandler(int intWindowId)
 	{
-		// draw content
-		GUILayout.BeginVertical();
-            
-            
-            if ( mIsDebuggerEditable )
-                GUI.TextArea(new Rect(this.mRectDebugTextArea.x, this.mRectDebugTextArea.y, this.mRectDebugTextArea.width, this.mRectDebugTextArea.height), mDebugMessageContent, mDebuggerFontStyleRef);
-            else
-			    GUI.Label( new Rect(this.mRectDebugTextArea.x, this.mRectDebugTextArea.y, this.mRectDebugTextArea.width, this.mRectDebugTextArea.height), mDebugMessageContent, mDebuggerFontStyleRef);
-            
-			mInputMessageContent = GUI.TextField( new Rect(mRectInputTextField.x, mRectInputTextField.y, mRectInputTextField.width, mRectInputTextField.height), mInputMessageContent );
-			if( GUI.Button( new Rect(mRectEnterBtn.x, mRectEnterBtn.y, mRectEnterBtn.width, mRectEnterBtn.height), "OK" ) )
-			{
-				OnEnterBtnClickHandler();
-			}
+        //GUILayout.BeginVertical();
 
-		GUILayout.EndVertical();
+                // draw content
+                scrollPosition = GUILayout.BeginScrollView(scrollPosition, GUILayout.Width(mRectDebugTextArea.width), GUILayout.Height(intScrollWindowHeight));
 
-		// draggable
-		GUI.DragWindow( new Rect(0, 0,intWindowWidth, intDraggableTitleHeight) );
+                    if ( mIsDebuggerEditable )
+                        GUILayout.TextArea( mDebugMessageContent, mDebuggerFontStyleRef, GUILayout.Width(mRectDebugTextArea.width-intScrollBoardMarginLeftRight) );// new Rect(0, 0, this.mRectDebugTextArea.width - intScrollBoardMarginLeftRight, this.mRectDebugTextArea.height), 
+                    else
+                        GUILayout.Label( mDebugMessageContent, mDebuggerFontStyleRef, GUILayout.Width(mRectDebugTextArea.width - intScrollBoardMarginLeftRight));
+            
+                GUILayout.EndScrollView();
+
+                // draw input & button
+                mInputMessageContent = GUI.TextField(new Rect(mRectInputTextField.x, mRectInputTextField.y, mRectInputTextField.width, mRectInputTextField.height), mInputMessageContent);
+                if (GUI.Button(new Rect(mRectEnterBtn.x, mRectEnterBtn.y, mRectEnterBtn.width, mRectEnterBtn.height), "OK"))
+                {
+                    OnEnterBtnClickHandler();
+                }
+
+        //GUILayout.EndVertical();
+
+        
+        // draggable
+        GUI.DragWindow( new Rect(0, 0,intWindowWidth, intDraggableTitleHeight) );
 	}
 
 	//
